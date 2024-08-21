@@ -17,6 +17,10 @@ inputs:
   commenter_exitcode:
     description: 'The exit code from a previous step output'
     required: true
+  github_event:
+    description: 'A GitHub event details passed from some other workflow.'
+    required: false
+    default: ''
   terraform_version:
     description: 'The version of terraform from the workflow.'
     required: false
@@ -37,6 +41,13 @@ runs:
           echo "version=${{ inputs.terraform_version }}" >> $GITHUB_OUTPUT
         fi
       shell: bash
+    - name: Set GITHUB_EVENT_JSON
+      run: |
+        if [ -z "${{ inputs.github_event }}" ]; then
+          echo "GITHUB_EVENT_JSON=$(echo ${{ toJSON(github.event) }})" >> $GITHUB_ENV
+        else
+          echo "GITHUB_EVENT_JSON=${{ inputs.github_event }}" >> $GITHUB_ENV
+        fi
     - name: Build commenter docker image (master)
       if: ${{ inputs.use_beta_version != 'true' }}
       run: docker build --build-arg TERRAFORM_VERSION=${{ steps.tf_version.outputs.version }} -t commenter https://github.com/GetTerminus/terraform-pr-commenter.git#dpr-fix-curl
@@ -52,7 +63,7 @@ runs:
       env:
         COMMENTER_INPUT: ${{ inputs.commenter_input }}
         COMMENTER_PLAN_FILE: ${{ inputs.commenter_plan_path }}
-        GITHUB_EVENT: ${{ toJSON(github.event) }}
+        GITHUB_EVENT: ${{ env.GITHUB_EVENT_JSON }}
       run: |
         docker run \
         -e GITHUB_TOKEN \
@@ -72,7 +83,7 @@ runs:
       if: ${{ inputs.commenter_type != 'plan' }}
       env:
         COMMENTER_INPUT: ${{ inputs.commenter_input }}
-        GITHUB_EVENT: ${{ toJSON(github.event) }}
+        GITHUB_EVENT: ${{ env.GITHUB_EVENT_JSON }}
       run: |
         docker run \
         -e GITHUB_TOKEN \
